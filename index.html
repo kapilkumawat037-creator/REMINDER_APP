@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Message Reminder</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+body{
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    transition:0.4s;
+}
+
+body.dark{
+    background:linear-gradient(135deg,#1f1c2c,#928dab);
+}
+
+.container{
+    width:95%;
+    max-width:900px;
+    background:rgba(255,255,255,0.15);
+    backdrop-filter:blur(20px);
+    border-radius:20px;
+    padding:30px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.2);
+    color:white;
+}
+
+h1{
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.form{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+    margin-bottom:20px;
+}
+
+.form input, .form textarea{
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    outline:none;
+}
+
+.form textarea{
+    grid-column:span 2;
+    resize:none;
+}
+
+button{
+    padding:10px 20px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.add-btn{
+    background:#00f2fe;
+    color:black;
+}
+
+.dark-toggle{
+    position:absolute;
+    top:20px;
+    right:20px;
+    background:black;
+    color:white;
+}
+
+.reminder-card{
+    background:rgba(255,255,255,0.2);
+    padding:15px;
+    border-radius:15px;
+    margin-bottom:15px;
+    position:relative;
+}
+
+.delete-btn{
+    position:absolute;
+    top:10px;
+    right:10px;
+    background:red;
+    color:white;
+    font-size:12px;
+    padding:5px 8px;
+}
+
+.countdown{
+    font-size:14px;
+    margin-top:8px;
+    opacity:0.8;
+}
+
+@media(max-width:600px){
+    .form{
+        grid-template-columns:1fr;
+    }
+    .form textarea{
+        grid-column:span 1;
+    }
+}
+</style>
+</head>
+<body>
+
+<button class="dark-toggle" onclick="toggleDark()">🌙</button>
+
+<div class="container">
+    <h1>Smart Message Reminder</h1>
+
+    <div class="form">
+        <input type="text" id="person" placeholder="Person Name">
+        <input type="datetime-local" id="datetime">
+        <textarea id="message" rows="3" placeholder="Message..."></textarea>
+        <button class="add-btn" onclick="addReminder()">Add Reminder</button>
+    </div>
+
+    <div id="reminderList"></div>
+</div>
+
+<audio id="sound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+
+<script>
+if("Notification" in window){
+    if(Notification.permission !== "granted"){
+        Notification.requestPermission();
+    }
+}
+
+let reminders = JSON.parse(localStorage.getItem("reminders")) || [];
+
+function saveReminders(){
+    localStorage.setItem("reminders", JSON.stringify(reminders));
+}
+
+function addReminder(){
+    const person = document.getElementById("person").value;
+    const message = document.getElementById("message").value;
+    const datetime = document.getElementById("datetime").value;
+
+    if(!person || !message || !datetime){
+        alert("Please fill all fields!");
+        return;
+    }
+
+    reminders.push({person,message,datetime,notified:false});
+    saveReminders();
+    renderReminders();
+}
+
+function deleteReminder(index){
+    reminders.splice(index,1);
+    saveReminders();
+    renderReminders();
+}
+
+function renderReminders(){
+    const list = document.getElementById("reminderList");
+    list.innerHTML = "";
+
+    reminders.forEach((reminder,index)=>{
+        const card = document.createElement("div");
+        card.className = "reminder-card";
+
+        card.innerHTML = `
+            <h3>${reminder.person}</h3>
+            <p>${reminder.message}</p>
+            <small>${new Date(reminder.datetime).toLocaleString()}</small>
+            <div class="countdown" id="countdown-${index}"></div>
+            <button class="delete-btn" onclick="deleteReminder(${index})">Delete</button>
+        `;
+
+        list.appendChild(card);
+    });
+}
+
+function checkReminders(){
+    const now = new Date().getTime();
+
+    reminders.forEach((reminder,index)=>{
+        const reminderTime = new Date(reminder.datetime).getTime();
+        const distance = reminderTime - now;
+
+        const countdownEl = document.getElementById(`countdown-${index}`);
+
+        if(distance > 0){
+            const hours = Math.floor(distance/(1000*60*60));
+            const minutes = Math.floor((distance%(1000*60*60))/(1000*60));
+            const seconds = Math.floor((distance%(1000*60))/1000);
+
+            if(countdownEl){
+                countdownEl.innerText = `Time Left: ${hours}h ${minutes}m ${seconds}s`;
+            }
+        }
+
+        if(distance <= 0 && !reminder.notified){
+            showNotification(reminder.person, reminder.message);
+            reminders[index].notified = true;
+            saveReminders();
+        }
+    });
+}
+
+function showNotification(person,message){
+    if(Notification.permission === "granted"){
+        new Notification(`Reminder for ${person}`,{
+            body:message,
+            icon:"https://cdn-icons-png.flaticon.com/512/1827/1827392.png"
+        });
+    }
+    alert(`Reminder for ${person}\n${message}`);
+}
+
+function toggleDark(){
+    document.body.classList.toggle("dark");
+}
+
+setInterval(checkReminders,1000);
+renderReminders();
+</script>
+
+</body>
+</html>
